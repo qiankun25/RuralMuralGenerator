@@ -17,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 import os
 
-from backend.core.config import settings
+from core.config import settings
 
 
 class ChromaDBService:

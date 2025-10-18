@@ -7,7 +7,7 @@ from langchain.tools import Tool
 from typing import Optional
 from loguru import logger
 
-from backend.services import chromadb_service
+from services import chromadb_service
 
 
 def search_village_knowledge(query: str) -> str:

@@ -6,8 +6,8 @@
 from typing import Dict, Optional
 from loguru import logger
 
-from backend.services import image_service
-from backend.core.config import settings
+from services import image_service
+from core.config import settings
 
 
 class ImageGeneratorAgent:

@@ -8,7 +8,7 @@ from typing import List, Set
 from loguru import logger
 import os
 
-from backend.core.config import settings
+from core.config import settings
 
 
 class SensitiveWordChecker:

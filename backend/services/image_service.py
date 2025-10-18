@@ -18,7 +18,7 @@ import os
 import requests
 from datetime import datetime
 
-from backend.core.config import settings
+from core.config import settings
 
 
 class ImageGenerationService:

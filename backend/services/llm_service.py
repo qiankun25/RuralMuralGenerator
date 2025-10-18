@@ -15,7 +15,7 @@ except ImportError:
 from dashscope import Generation
 from http import HTTPStatus
 
-from backend.core.config import settings
+from core.config import settings
 
 
 class LLMService:

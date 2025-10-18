@@ -21,9 +21,9 @@ except ImportError:
     ChatOpenAI = None
     ConversationBufferMemory = None
 
-from backend.tools import village_knowledge_tool, government_data_tool
-from backend.services import llm_service, chromadb_service, government_service
-from backend.core.config import settings
+from tools import village_knowledge_tool, government_data_tool
+from services import llm_service, chromadb_service, government_service
+from core.config import settings
 
 
 class CultureAnalystAgent:

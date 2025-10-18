@@ -8,7 +8,7 @@ from typing import Optional
 from loguru import logger
 import json
 
-from backend.services import government_service
+from services import government_service
 
 
 def query_government_data(village_name: str) -> str:

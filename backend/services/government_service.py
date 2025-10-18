@@ -15,7 +15,7 @@ except ImportError:
 import asyncio
 from functools import lru_cache
 
-from backend.core.config import settings
+from core.config import settings
 
 
 class GovernmentDataService:
