@@ -4,12 +4,14 @@ FastAPI主应用
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from loguru import logger
 import sys
 
 from core.config import settings
 from api.routes import router
 from services import chromadb_service
+from fastapi.staticfiles import StaticFiles
 
 
 # 配置日志
@@ -26,39 +28,13 @@ logger.add(
     level=settings.log_level
 )
 
-
-# 创建FastAPI应用
-app = FastAPI(
-    title="乡村墙绘AI生成系统",
-    description="基于多智能体协作和RAG技术的乡村墙绘个性化设计系统",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
-
-
-# 配置CORS（允许Streamlit前端跨域访问）
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应限制具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# 注册路由
-app.include_router(router, prefix="/api", tags=["API"])
-
-
-# 启动事件
-@app.on_event("startup")
-async def startup_event():
-    """应用启动时执行"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ========启动逻辑========
     logger.info("=" * 60)
     logger.info("乡村墙绘AI生成系统 - 后端服务启动")
     logger.info("=" * 60)
-    
+
     # 初始化ChromaDB
     try:
         logger.info("初始化ChromaDB...")
@@ -79,12 +55,44 @@ async def startup_event():
     logger.info(f"API文档: http://{settings.backend_host}:{settings.backend_port}/docs")
     logger.info("=" * 60)
 
+    # =========应用运行中========
+    yield
 
-# 关闭事件
-@app.on_event("shutdown")
-async def shutdown_event():
-    """应用关闭时执行"""
+    # =========关闭逻辑=========
     logger.info("后端服务正在关闭...")
+
+
+
+# 创建FastAPI应用
+app = FastAPI(
+    title="乡村墙绘AI生成系统",
+    description="基于多智能体协作和RAG技术的乡村墙绘个性化设计系统",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan
+)
+
+
+# 配置CORS（允许Streamlit前端跨域访问）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # TODO:生产环境后配置具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# 注册路由
+app.include_router(router, prefix="/api", tags=["API"])
+
+# 挂载静态文件目录，暴露生成的图片
+try:
+    app.mount("/media", StaticFiles(directory=settings.image_output_dir), name="media")
+    logger.info(f"✅ 静态文件已挂载: /media -> {settings.image_output_dir}")
+except Exception as e:
+    logger.error(f"静态文件挂载失败: {e}")
 
 
 # 根路径

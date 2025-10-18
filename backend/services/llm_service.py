@@ -15,11 +15,12 @@ except ImportError:
 from dashscope import Generation
 from http import HTTPStatus
 
-from core.config import settings
+from backend.core.config import settings
 
 
 class LLMService:
     """LLM服务类"""
+
     
     def __init__(self):
         """初始化LLM服务"""

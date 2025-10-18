@@ -79,7 +79,7 @@ async def analyze_culture(request: AnalyzeRequest):
         logger.info(f"收到文化分析请求: {request.village_info.name}")
         
         # 调用文化分析智能体
-        culture_analysis = culture_analyst.analyze(request.village_info.dict())
+        culture_analysis = culture_analyst.analyze(request.village_info.model_dump())
         
         return AnalyzeResponse(
             status="success",

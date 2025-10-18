@@ -3,7 +3,10 @@
 封装政府API调用
 """
 
-from typing import Optional, Dict, List
+import time
+import json
+import requests
+from typing import Dict, Any, Optional
 import logging
 logger = logging.getLogger(__name__)
 
@@ -15,79 +18,204 @@ except ImportError:
 import asyncio
 from functools import lru_cache
 
-from core.config import settings
+from backend.core.config import settings
+
+
+class ZhejiangPlatformClient:
+    """
+    浙江公共数据统一平台数据接口
+    """
+
+    # 平台固定常量
+    SIGN_URL = "https://data.zjzwfw.gov.cn/jimp/sign/createsign.do"
+    DATA_URL = "https://data.zjzwfw.gov.cn/interface/gateway.do"
+
+    def __init__(
+        self,
+        *,
+        app_id: str,
+        interface_id: str,
+        version: str,
+        app_secret: str,
+        user_secret: str,
+        charset: str = "utf-8",
+        origin: str = "0"
+    ):
+        self.app_id       = app_id
+        self.interface_id = interface_id
+        self.version      = version
+        self.app_secret   = app_secret
+        self.user_secret  = user_secret
+        self.charset      = charset
+        self.origin       = origin
+        self.session      = requests.Session()
+
+    # -------------------- 私有工具 --------------------
+    def _timestamp(self) -> str:
+        return str(int(time.time() * 1000))
+
+    def _json_str(self, obj: Any) -> str:
+        return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+
+    def _form(self, **kwargs) -> Dict[str, str]:
+        """统一 form 字段组装"""
+        return {k: str(v) for k, v in kwargs.items()}
+
+    # -------------------- 统一流程 --------------------
+    def _get_sign(self, biz_content: str) -> str:
+        """验签接口取 sign"""
+        params = {
+            "app_id": self.app_id,
+            "interface_id": self.interface_id,
+            "version": self.version,
+            "charset": self.charset,
+            "timestamp": self._timestamp(),   
+            "origin": self.origin,
+            "biz_content": biz_content,       
+            "sign": ""                        # 平台要求必须存在
+        }
+        resp = self.session.post(self.SIGN_URL, data=params)
+        sign_text = resp.text.strip()
+        if not sign_text:
+            raise RuntimeError("验签接口返回空 body")
+        # 平台直接返回 64 位 16 进制字符串，无需 JSON 解析
+        return sign_text
+    def query_count(self, page_num: int = 1, page_size: int = 1) -> int:
+        """只返回总条数（data 字段）"""
+        biz = self._json_str({
+            "userSecret": self.user_secret,
+            "appSecret" : self.app_secret,
+            "pageNum"   : str(page_num),
+            "pageSize"  : str(page_size)
+        })
+        sign = self._get_sign(biz)
+
+        params = self._form(
+            app_id       = self.app_id,
+            interface_id = self.interface_id,
+            version      = self.version,
+            charset      = self.charset,
+            timestamp    = self._timestamp(),
+            origin       = self.origin,
+            sign         = sign,
+            biz_content  = biz
+        )
+        resp = self.session.post(self.DATA_URL, data=params)
+        outer = resp.json()                  # 第一层壳
+        if outer.get("code") != 200:
+            raise RuntimeError(f"HTTP 状态异常: {outer}")
+
+        inner = json.loads(outer["data"])    # 第二层业务 JSON
+        if inner.get("code") != "1":         # 注意是字符串 "1"
+            raise RuntimeError(f"业务失败: {inner}")
+
+        return int(inner["data"]["count"])  
+
+
+# -------------------- 预置实例 --------------------
+def shaoxing_client(app_secret: str, user_secret: str) -> ZhejiangPlatformClient:
+    """绍兴市 → 已固化参数"""
+    return ZhejiangPlatformClient(
+        app_id       = "sxkfyy",
+        interface_id = "biz06043036zjzjsxclyxx",
+        version      = "1.0.0",
+        app_secret   = app_secret,
+        user_secret  = user_secret
+    )
+
+
+class ZhejiangAdapter:
+    """
+    浙江省数据平台适配器
+    封装 ZhejiangPlatformClient，使其兼容 GovernmentDataService 的接口形式
+    """
+
+    def __init__(self, app_secret: str, user_secret: str):
+        self.client = shaoxing_client(app_secret, user_secret)
+
+    def query_village_data(self, village_name: str) -> Dict:
+        try:
+            # 查询并过滤结果
+            biz = self.client._json_str({
+                "userSecret": self.client.user_secret,
+                "appSecret": self.client.app_secret,
+                "pageNum": "1",
+                "pageSize": "200"
+            })
+            sign = self.client._get_sign(biz)
+            params = self.client._form(
+                app_id=self.client.app_id,
+                interface_id="biz06043036zjzjsxclyxxfy",
+                version=self.client.version,
+                charset=self.client.charset,
+                timestamp=self.client._timestamp(),
+                origin=self.client.origin,
+                sign=sign,
+                biz_content=biz
+            )
+
+            resp = self.client.session.post(self.client.DATA_URL, data=params)
+            outer = resp.json()
+            inner = json.loads(outer["data"])
+            datalist = json.loads(inner["data"]["data"])
+
+            # 查找匹配的村落
+            match = next((v for v in datalist if v["xcmc"] == village_name), None)
+            if match:
+                return {"status": "success", "data": match, "source": "zhejiang_platform"}
+            else:
+                return {"status": "not_found", "data": {}, "source": "zhejiang_platform"}
+
+        except Exception as e:
+            logger.error(f"ZhejiangAdapter 查询异常: {e}")
+            return {"status": "error", "message": str(e), "source": "zhejiang_platform"}
 
 
 class GovernmentDataService:
     """政府开放数据平台服务类"""
     
     def __init__(self):
-        """初始化政府数据服务"""
-        self.api_key = settings.government_api_key
-        self.base_url = settings.government_api_base_url
-        self.timeout = settings.government_api_timeout
-        self.retry = settings.government_api_retry
-        
-        if not self.api_key:
-            logger.warning("未配置GOVERNMENT_API_KEY，政府数据查询功能将不可用")
-    
-    async def query_village_data(
-        self,
-        village_name: str,
-        province: Optional[str] = None
-    ) -> Dict:
-        """
-        查询村落数据
-        
-        Args:
-            village_name: 村落名称
-            province: 省份（可选，用于精确匹配）
-            
-        Returns:
-            村落数据字典
-        """
-        try:
-            if not self.api_key:
-                logger.warning("未配置API密钥，返回空数据")
-                return self._get_mock_data(village_name)
-            
-            # 构建请求参数
-            params = {
-                "name": village_name,
-                "api_key": self.api_key
+            self.api_key = getattr(settings, "government_api_key", None)
+            self.base_url = getattr(settings, "government_api_base_url", None)
+            self.timeout = getattr(settings, "government_api_timeout", 10)
+            self.retry = getattr(settings, "government_api_retry", 3)
+
+            # 兼容性增强：可配置使用不同省份适配器
+            self.province_adapters = {
+                "浙江省": ZhejiangAdapter(
+                    app_secret="b51f70786870462fa7f6d90bddefce8b",
+                    user_secret="d378b256f7af480c826bb306f19c42e9"
+                )
             }
-            
-            if province:
-                params["province"] = province
-            
-            # 发送异步请求
+    
+    async def query_village_data(self, village_name: str, province: Optional[str] = None) -> Dict:
+        try:
+            # 若为浙江省，走专用适配器
+            if province in self.adapters:
+                adapter = self.adapters[province]
+                return adapter.query_village_data(village_name)
+
+            # 否则走默认HTTP接口
+            if not self.api_key:
+                return self._get_mock_data(village_name)
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 for attempt in range(self.retry):
                     try:
-                        response = await client.get(
+                        resp = await client.get(
                             f"{self.base_url}/villages/search",
-                            params=params
+                            params={"name": village_name, "api_key": self.api_key}
                         )
-                        response.raise_for_status()
-                        
-                        data = response.json()
-                        logger.info(f"成功查询村落数据: {village_name}")
-                        
-                        return {
-                            "status": "success",
-                            "data": data,
-                            "source": "government_api"
-                        }
-                        
+                        resp.raise_for_status()
+                        data = resp.json()
+                        return {"status": "success", "data": data, "source": "government_api"}
                     except httpx.HTTPError as e:
                         logger.warning(f"政府API请求失败 (尝试 {attempt + 1}/{self.retry}): {e}")
                         if attempt == self.retry - 1:
                             raise
                         await asyncio.sleep(1)
-            
         except Exception as e:
             logger.error(f"查询政府数据异常: {e}")
-            # 返回Mock数据作为降级方案
             return self._get_mock_data(village_name)
     
     def query_village_data_sync(

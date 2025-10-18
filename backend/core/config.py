@@ -22,29 +22,15 @@ class Settings(BaseSettings):
     # ==================== LLM API配置 ====================
     dashscope_api_key: str = Field(
         default="",
-        description="阿里云通义千问/万相API密钥"
+        description="阿里云通义千问API密钥"
     )
     
     wenxin_api_key: Optional[str] = Field(
         default=None,
         description="文心一言API密钥（备用）"
     )
+
     
-    wenxin_secret_key: Optional[str] = Field(
-        default=None,
-        description="文心一言Secret密钥（备用）"
-    )
-    
-    # ==================== 外部数据API ====================
-    government_api_key: str = Field(
-        default="",
-        description="政府开放数据平台API密钥"
-    )
-    
-    government_api_base_url: str = Field(
-        default="https://api.example.gov.cn",
-        description="政府API基础URL"
-    )
     
     # ==================== 数据库配置 ====================
     chromadb_path: str = Field(
@@ -149,7 +135,7 @@ class Settings(BaseSettings):
     
     # ==================== LLM模型配置 ====================
     llm_model_name: str = Field(
-        default="qwen-plus",
+        default="qwen-flash",
         description="LLM模型名称"
     )
     
@@ -199,8 +185,7 @@ class Settings(BaseSettings):
         """验证API密钥配置"""
         validation_result = {
             "dashscope": bool(self.dashscope_api_key and self.dashscope_api_key != ""),
-            "government": bool(self.government_api_key and self.government_api_key != ""),
-            "wenxin": bool(self.wenxin_api_key and self.wenxin_secret_key)
+            "wenxin": bool(self.wenxin_api_key)
         }
         return validation_result
 

@@ -22,7 +22,7 @@ def query_government_data(village_name: str) -> str:
         政府数据的文本描述
     """
     try:
-        result = government_service.query_village_data_sync(village_name)
+        result = government_service.query_village_data_sync(village_name, "浙江省")
         
         if result["status"] in ["success", "mock"]:
             data = result["data"]

@@ -17,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 import os
 
-from core.config import settings
+from backend.core.config import settings
 
 
 class ChromaDBService:
@@ -40,9 +40,9 @@ class ChromaDBService:
             self.client = chromadb.PersistentClient(
                 path=settings.chromadb_path,
                 settings=ChromaSettings(
-                    anonymized_telemetry=False,
-                    allow_reset=True
-                )
+                    allow_reset=True,
+                    anonymized_telemetry=False
+                ),
             )
             
             # 配置Embedding函数

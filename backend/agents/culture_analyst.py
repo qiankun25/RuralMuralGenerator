@@ -111,7 +111,7 @@ class CultureAnalystAgent:
             if not village_name:
                 return "未提供村落名称"
             
-            result = government_service.query_village_data_sync(village_name)
+            result = government_service.query_village_data_sync(village_name,"浙江省")
             
             if result["status"] in ["success", "mock"]:
                 data = result["data"]

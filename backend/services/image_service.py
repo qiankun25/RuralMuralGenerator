@@ -18,7 +18,7 @@ import os
 import requests
 from datetime import datetime
 
-from core.config import settings
+from backend.core.config import settings
 
 
 class ImageGenerationService:
@@ -70,7 +70,7 @@ class ImageGenerationService:
             
             # 调用通义万相API
             response = ImageSynthesis.call(
-                model='wanx-v1',
+                model='wan2.2-t2i-plus',
                 prompt=prompt,
                 negative_prompt=negative_prompt,
                 style=style or self.default_style,
@@ -79,16 +79,29 @@ class ImageGenerationService:
             )
             
             if response.status_code == HTTPStatus.OK:
+                # 有些情况下第三方API返回200但没有结果，需要处理空结果的回退
+                if not getattr(response, 'output', None) or not getattr(response.output, 'results', None):
+                    logger.warning("图像服务返回200但未包含results，使用Mock图像作为回退")
+                    return self._get_mock_image()
+
                 results = []
-                
+
                 for i, result in enumerate(response.output.results):
                     image_url = result.url
                     
                     # 下载图像到本地
                     local_path = self._download_image(image_url, f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{i}")
-                    
+
+                    # 构建对外可访问的URL（FastAPI 已挂载 /media -> image_output_dir）
+                    public_url = ""
+                    if local_path:
+                        public_url = f"{settings.api_base_url.rstrip('/')}/media/{os.path.basename(local_path)}"
+                    else:
+                        # 如果未能下载则回退到提供的远端URL（可能不可直接被前端访问）
+                        public_url = image_url
+
                     results.append({
-                        "url": image_url,
+                        "url": public_url,
                         "local_path": local_path
                     })
                 
@@ -149,19 +162,30 @@ class ImageGenerationService:
         """
         mock_images_dir = "./data/mock_images"
         os.makedirs(mock_images_dir, exist_ok=True)
-        
+
         # 检查是否有Mock图像
         mock_images = [f for f in os.listdir(mock_images_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
-        
+
         if mock_images:
-            mock_image_path = os.path.join(mock_images_dir, mock_images[0])
-            logger.info(f"使用Mock图像: {mock_image_path}")
-            
+            src_mock_image_path = os.path.join(mock_images_dir, mock_images[0])
+            # 复制一份到输出目录，确保通过 /media 可访问
+            dst_filename = f"mock_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.path.basename(src_mock_image_path)}"
+            dst_mock_path = os.path.join(self.output_dir, dst_filename)
+            try:
+                import shutil
+                shutil.copyfile(src_mock_image_path, dst_mock_path)
+                logger.info(f"Mock image copied to output dir: {dst_mock_path}")
+            except Exception as e:
+                logger.error(f"Failed to copy mock image: {e}")
+                dst_mock_path = src_mock_image_path
+
+            public_url = f"{settings.api_base_url.rstrip('/')}/media/{os.path.basename(dst_mock_path)}"
+
             return {
                 "status": "mock",
                 "images": [{
-                    "url": "",
-                    "local_path": mock_image_path
+                    "url": public_url,
+                    "local_path": dst_mock_path
                 }],
                 "prompt": "Mock image for demonstration",
                 "style": "mock"

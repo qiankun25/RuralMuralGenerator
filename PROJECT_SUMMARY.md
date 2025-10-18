@@ -241,7 +241,7 @@
 ✅ backend/services/chromadb_service.py # ChromaDB服务
 ✅ backend/services/llm_service.py     # LLM服务
 ✅ backend/services/image_service.py   # 图像生成服务
-✅ backend/services/government_service.py # 政府API服务
+
 
 ✅ backend/tools/chromadb_tool.py      # ChromaDB检索工具
 ✅ backend/tools/government_api_tool.py # 政府API工具
