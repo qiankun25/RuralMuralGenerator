@@ -83,6 +83,12 @@ scripts\start_backend.bat
 **方式2：手动启动**
 ```bash
 cd backend
+//添加项目根目录到环境变量中
+powershell
+$env:PYTHONPATH = "D:\03 lesson\05 大三上 微服务\RuralMuralGenerator"
+
+powershell
+
 python -m uvicorn main:app --reload --port 8000
 ```
 

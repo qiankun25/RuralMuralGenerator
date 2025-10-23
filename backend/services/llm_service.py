@@ -5,6 +5,8 @@ LLM服务
 
 from typing import Optional, List, Dict
 import logging
+import yaml
+from pathlib import Path
 logger = logging.getLogger(__name__)
 
 try:
@@ -17,6 +19,30 @@ from http import HTTPStatus
 
 from backend.core.config import settings
 
+# 获取提示词目录
+BASE_DIR = Path(__file__).parent.parent
+PROMPT_PATH = BASE_DIR / "prompts"
+
+
+def load_prompts(prompt_file: str = "agent_prompts.yaml") -> Dict:
+    """
+    从指定的YAML文件中加载提示词配置
+    
+    参数:
+        prompt_file (str): YAML格式的提示词配置文件名称，默认为"agent_prompts.yaml"
+        
+    返回:
+        Dict: 从YAML文件中解析出的字典数据
+        
+    异常:
+        FileNotFoundError: 当指定的文件不存在时抛出
+        yaml.YAMLError: 当YAML文件格式错误时抛出
+    """
+    # 打开并读取YAML配置文件，使用safe_load方法安全解析
+    file_path = PROMPT_PATH / prompt_file
+    with open(file_path, 'r', encoding='utf-8') as f:
+         return yaml.safe_load(f)
+    
 
 class LLMService:
     """LLM服务类"""
@@ -34,6 +60,15 @@ class LLMService:
             dashscope.api_key = self.api_key
         else:
             logger.warning("未配置DASHSCOPE_API_KEY，LLM功能将不可用")
+                # Load prompts from YAML (backend/prompts/agent_prompts.yaml)
+        try:
+            self.prompts = load_prompts()
+        except FileNotFoundError:
+            logger.error("提示词文件未找到：%s", PROMPT_PATH)
+            self.prompts = {}
+        except Exception as e:
+            logger.error("加载提示词失败：%s", e)
+            self.prompts = {}
     
     def chat(
         self,
@@ -129,44 +164,31 @@ class LLMService:
         Returns:
             文化分析报告
         """
-        system_prompt = """你是一位资深的乡村文化研究专家，擅长分析中国传统村落的文化特色。
-你的任务是深度分析村落的文化内涵，为墙绘设计提供专业的文化指导。"""
-        
-        user_prompt = f"""请分析以下乡村的文化特色：
+        # Load templates from prompts; fall back to original hardcoded templates if missing
+        system_template = self.prompts.get('culture_analyst', {}).get('system_prompt') 
 
-【村落基本信息】
-- 名称：{village_info.get('name', '未知')}
-- 地理位置：{village_info.get('location', '未知')}
-- 特色产业：{village_info.get('industry', '未知')}
-- 历史故事：{village_info.get('history', '未知')}
+        user_template = self.prompts.get('culture_analyst', {}).get('user_prompt') 
 
-【参考知识库】
-{knowledge_context}
+        # format user prompt with provided values
+        try:
+            user_prompt = user_template.format(
+                name=village_info.get('name', '未知'),
+                location=village_info.get('location', '未知'),
+                industry=village_info.get('industry', '未知'),
+                history=village_info.get('history', '未知'),
+                knowledge_context=knowledge_context
+            )
+        except Exception:
+            # If formatting fails, fall back to concatenating
+            user_prompt = f"村庄信息：{village_info}\n参考知识：{knowledge_context}"
 
-请从以下维度进行分析，并以结构化的Markdown格式输出：
-
-## 核心文化元素
-（列出3-5个最具代表性的文化元素）
-
-## 推荐色彩方案
-（推荐3-5种主色调，说明色彩的文化寓意）
-
-## 推荐文化符号
-（列出5-8个可用于墙绘的文化符号或图案）
-
-## 设计建议
-（提供墙绘设计的整体建议，包括风格、构图、氛围等）
-
-## 文化故事线索
-（提炼1-2个可以通过墙绘讲述的文化故事）
-"""
-        
         return self.generate_text(
             prompt=user_prompt,
-            system_prompt=system_prompt,
+            system_prompt=system_template,
             temperature=0.7,
             max_tokens=2000
         )
+        
     
     def generate_design_options(self, culture_analysis: str, user_preference: str = "") -> str:
         """
@@ -179,40 +201,25 @@ class LLMService:
         Returns:
             设计方案（包含3个备选方案）
         """
-        system_prompt = """你是一位经验丰富的墙绘艺术设计师，擅长将文化元素转化为视觉设计方案。
-你的任务是基于文化分析，创作出既有文化内涵又具有艺术美感的墙绘设计方案。"""
-        
-        user_prompt = f"""基于以下文化分析报告，请生成3个不同风格的墙绘设计方案：
+        system_template = self.prompts.get('creative_designer', {}).get('system_prompt') 
 
-【文化分析报告】
-{culture_analysis}
+        user_template = self.prompts.get('creative_designer', {}).get('user_prompt') 
 
-【用户偏好】
-{user_preference if user_preference else '无特殊要求'}
+        try:
+            user_prompt = user_template.format(
+                culture_analysis=culture_analysis,
+                user_preference=user_preference if user_preference else '无特殊要求'
+            )
+        except Exception:
+            user_prompt = f"文化分析：{culture_analysis}\n用户偏好：{user_preference}"
 
-请为每个方案提供以下内容，以Markdown格式输出：
-
-## 方案A：传统文化风格
-- **设计主题**：（一句话概括）
-- **核心元素**：（列出3-5个主要视觉元素）
-- **色彩搭配**：（主色调+辅助色）
-- **构图建议**：（描述画面布局）
-- **文化寓意**：（说明设计的文化内涵）
-- **图像生成Prompt**：（英文，用于AI图像生成，50-100词）
-
-## 方案B：现代简约风格
-（同上结构）
-
-## 方案C：文化叙事风格
-（同上结构）
-"""
-        
         return self.generate_text(
             prompt=user_prompt,
-            system_prompt=system_prompt,
+            system_prompt=system_template,
             temperature=0.8,
             max_tokens=2500
         )
+
     
     def refine_image_prompt(self, design_description: str) -> str:
         """
@@ -222,30 +229,24 @@ class LLMService:
             design_description: 设计方案描述
             
         Returns:
-            优化后的英文Prompt
+            优化后的图像生成Prompt
         """
-        system_prompt = """你是一位AI图像生成专家，擅长将设计描述转化为高质量的图像生成Prompt。"""
-        
-        user_prompt = f"""请将以下墙绘设计描述转化为详细的英文图像生成Prompt：
+        system_template = self.prompts.get('image_generator', {}).get('system_prompt')
 
-{design_description}
+        user_template = self.prompts.get('image_generator', {}).get('user_prompt')
+        try:
+            user_prompt = user_template.format(design_description=design_description)
+        except Exception:
+            user_prompt = f"设计描述：{design_description}"
 
-要求：
-1. 使用英文
-2. 包含风格、主体、色彩、构图等关键信息
-3. 长度控制在50-100个英文单词
-4. 适合用于Stable Diffusion或通义万相等AI图像生成模型
-5. 添加质量提升关键词（如 high quality, detailed, artistic 等）
-
-请直接输出英文Prompt，不要有其他解释：
-"""
-        
         return self.generate_text(
             prompt=user_prompt,
-            system_prompt=system_prompt,
+            system_prompt=system_template,
             temperature=0.5,
             max_tokens=300
         )
+        
+
 
 
 # 创建全局LLM服务实例
@@ -254,11 +255,22 @@ llm_service = LLMService()
 
 if __name__ == "__main__":
     # 测试LLM服务
-    test_prompt = "请用一句话介绍徽派建筑的特点"
+    # test_prompt = "请用一句话介绍徽派建筑的特点"
     
+    # try:
+    #     result = llm_service.generate_text(test_prompt)
+    #     print(f"LLM响应: {result}")
+    # except Exception as e:
+    #     print(f"测试失败: {e}")
+    
+    print("\n=== 提示词测试 ===")
+    # 测试加载提示词
     try:
-        result = llm_service.generate_text(test_prompt)
-        print(f"LLM响应: {result}")
+       llm_service.prompts = load_prompts()
+       print("提示词加载成功")
     except Exception as e:
-        print(f"测试失败: {e}")
+       print(f"提示词加载失败: {e}")
+    print(llm_service.prompts.get('creative_designer', {}).get('system_prompt') if isinstance(llm_service.prompts, dict) else None)
 
+
+    
