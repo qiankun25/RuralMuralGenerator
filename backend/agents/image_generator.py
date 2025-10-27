@@ -20,27 +20,26 @@ class ImageGeneratorAgent:
     def generate(
         self,
         image_prompt: str,
-        style_preference: str = "traditional",
         size: str = "1024*1024"
     ) -> Dict:
         """
         生成墙绘图像
         
         Args:
-            image_prompt: 图像生成Prompt（英文）
-            style_preference: 风格偏好 (traditional/modern/narrative)
+            image_prompt: 图像生成Prompt
             size: 图像尺寸
             
         Returns:
             生成结果字典
         """
         try:
-            logger.info(f"开始生成图像，风格: {style_preference}")
+            logger.info(f"开始生成图像")
             
             # 调用图像生成服务
             result = image_service.generate_mural_image(
                 design_prompt=image_prompt,
-                style_preference=style_preference
+                size=size,
+                num=1
             )
             
             if result["status"] in ["success", "mock"]:
@@ -49,7 +48,6 @@ class ImageGeneratorAgent:
                     "status": "success",
                     "images": result["images"],
                     "prompt": image_prompt,
-                    "style": style_preference,
                     "is_mock": result["status"] == "mock"
                 }
             else:
@@ -70,7 +68,6 @@ class ImageGeneratorAgent:
         self,
         original_prompt: str,
         adjustment: str,
-        style_preference: str = "traditional"
     ) -> Dict:
         """
         根据调整要求重新生成图像
@@ -90,8 +87,7 @@ class ImageGeneratorAgent:
             adjusted_prompt = f"{original_prompt}, {adjustment}"
             
             return self.generate(
-                image_prompt=adjusted_prompt,
-                style_preference=style_preference
+                image_prompt=adjusted_prompt
             )
             
         except Exception as e:
@@ -111,7 +107,7 @@ if __name__ == "__main__":
     test_prompt = "A beautiful Chinese village mural painting featuring traditional Hui-style architecture with white walls, black tiles, and horse-head walls, artistic, detailed, high quality"
     
     try:
-        result = image_generator.generate(test_prompt, style_preference="traditional")
+        result = image_generator.generate(test_prompt)
         print("=== 图像生成结果 ===")
         print(f"状态: {result['status']}")
         if result['status'] == 'success':

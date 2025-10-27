@@ -44,7 +44,6 @@ class ImageGenerationService:
         self,
         prompt: str,
         negative_prompt: Optional[str] = None,
-        style: Optional[str] = None,
         size: str = "1024*1024",
         n: int = 1
     ) -> Dict:
@@ -54,7 +53,6 @@ class ImageGenerationService:
         Args:
             prompt: 图像描述（英文）
             negative_prompt: 负面提示词（可选）
-            style: 图像风格（可选）
             size: 图像尺寸，支持 "1024*1024", "720*1280", "1280*720"
             n: 生成图像数量（1-4）
             
@@ -73,7 +71,6 @@ class ImageGenerationService:
                 model='wan2.2-t2i-plus',
                 prompt=prompt,
                 negative_prompt=negative_prompt,
-                style=style or self.default_style,
                 size=size,
                 n=n
             )
@@ -202,40 +199,29 @@ class ImageGenerationService:
     
     def generate_mural_image(
         self,
-        design_prompt: str,
-        style_preference: str = "traditional"
+        design_prompt: str,  
+        size: str = "1024*1024",
+        num: int = 1
     ) -> Dict:
         """
         生成墙绘图像（高级接口）
         
         Args:
-            design_prompt: 设计描述（英文）
-            style_preference: 风格偏好 (traditional/modern/narrative)
-            
+            design_prompt: 设计描述
+            size: 图像尺寸
+            num: 生成图像数量
         Returns:
             生成结果
         """
-        # 根据风格偏好选择通义万相的style参数
-        style_mapping = {
-            "traditional": "<chinese-painting>",  # 中国画风格
-            "modern": "<flat-illustration>",      # 扁平插画风格
-            "narrative": "<watercolor>"           # 水彩风格
-        }
-        
-        style = style_mapping.get(style_preference, self.default_style)
-        
-        # 添加质量提升关键词
-        enhanced_prompt = f"{design_prompt}, high quality, detailed, artistic, mural painting, vibrant colors"
-        
-        # 负面提示词
-        negative_prompt = "low quality, blurry, distorted, ugly, bad anatomy, watermark, text"
-        
+      
+        # 中文负面提示词
+        negative_prompt = "低质量，模糊，失真，丑陋，比例失调，水印，文字，logo，卡通，3D渲染，照片"
+
         return self.generate_image(
-            prompt=enhanced_prompt,
+            prompt=design_prompt,
             negative_prompt=negative_prompt,
-            style=style,
-            size="1024*1024",
-            n=1
+            size=size,
+            n=num
         )
 
 

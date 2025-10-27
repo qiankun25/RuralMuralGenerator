@@ -26,6 +26,7 @@ maral-generator-env\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
+或者按照requirements.txt文件中逐行安装依赖：
 
 ### 4. 配置环境变量
 
@@ -85,8 +86,7 @@ scripts\start_backend.bat
 cd backend
 //添加项目根目录到环境变量中
 powershell
-$env:PYTHONPATH = "D:\03 lesson\05 大三上 微服务\RuralMuralGenerator"
-
+$env:PYTHONPATH = "D:\03 lesson\05_微服务\RuralMuralGenerator"
 powershell
 
 python -m uvicorn main:app --reload --port 8000

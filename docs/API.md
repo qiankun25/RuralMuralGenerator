@@ -85,7 +85,7 @@
 {
   "status": "success",
   "message": "设计方案生成完成",
-  "design_options": "## 方案A：传统文化风格\n...",
+  "design_schema": "## 方案A：传统文化风格\n...",
   "num_options": 3,
   "timestamp": "2025-10-13T10:35:00"
 }
@@ -188,7 +188,7 @@
 {
   "status": "success",
   "message": "设计方案优化完成",
-  "design_options": "## 优化后的方案A\n...",
+  "design_schema": "## 优化后的方案A\n...",
   "num_options": 1,
   "timestamp": "2025-10-13T10:45:00"
 }

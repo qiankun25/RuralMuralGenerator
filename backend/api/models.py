@@ -9,6 +9,13 @@ from datetime import datetime
 
 # ==================== 请求模型 ====================
 
+
+
+class ChatRequest(BaseModel):
+    session_id: str | None = None
+    user_input: str
+
+
 class VillageInfo(BaseModel):
     """村落信息"""
     name: str = Field(..., description="村落名称")
@@ -44,6 +51,12 @@ class RefineDesignRequest(BaseModel):
 
 # ==================== 响应模型 ====================
 
+class ChatResponse(BaseModel):
+    session_id: str
+    messages: list
+    current_stage: str
+    is_completed: bool
+
 class BaseResponse(BaseModel):
     """基础响应"""
     status: str = Field(..., description="状态: success/error")
@@ -59,7 +72,7 @@ class AnalyzeResponse(BaseResponse):
 
 class DesignResponse(BaseResponse):
     """设计方案响应"""
-    design_options: Optional[str] = Field(None, description="设计方案（Markdown格式）")
+    design_schema: Optional[str] = Field(None, description="设计方案（Markdown格式）")
     num_options: Optional[int] = Field(None, description="方案数量")
 
 

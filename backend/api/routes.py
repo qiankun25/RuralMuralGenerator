@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 from typing import Dict
 import uuid
 from datetime import datetime
+from pydantic import BaseModel
+from models.session import create_session, get_session
+from models.state import  Stage
+from services.workflow_manager import run_workflow  
+
+router = APIRouter()
 
 from api.models import (
     AnalyzeRequest, AnalyzeResponse,
@@ -16,9 +22,10 @@ from api.models import (
     ImageGenerationRequest, ImageGenerationResponse,
     RefineDesignRequest, BaseResponse,
     TaskStatusResponse, HealthCheckResponse,
-    ImageInfo
+    ImageInfo,
+    ChatRequest, ChatResponse
 )
-from agents import culture_analyst, creative_designer, image_generator, crew_manager
+from agents import culture_analyst, creative_designer, image_generator
 from services import chromadb_service
 from core.config import settings
 
@@ -66,6 +73,55 @@ async def health_check():
         )
 
 
+
+
+
+@router.post("/chat", response_model=ChatResponse)
+def chat_endpoint(request: ChatRequest):
+    if request.session_id is None:
+        session_id = create_session()
+    else:
+        session_id = request.session_id
+
+    try:
+        state = get_session(session_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Session expired or invalid")
+
+    is_completed = run_workflow(request.user_input, state)
+
+    return ChatResponse(
+        session_id=session_id,
+        messages=[{
+            "role": msg.role,
+            "content": msg.content,
+            "agent_name": msg.agent_name
+        } for msg in state.messages],
+        current_stage=state.stage.value,
+        is_completed=is_completed
+    )
+
+@router.get("/chat/{session_id}", response_model=ChatResponse)
+def get_chat_history(session_id: str):
+    try:
+        state = get_session(session_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    is_completed = (state.stage == Stage.IMAGE and 
+                    any("确认" in msg.content for msg in reversed(state.messages) if msg.role == "user"))
+
+    return ChatResponse(
+        session_id=session_id,
+        messages=[{
+            "role": msg.role,
+            "content": msg.content,
+            "agent_name": msg.agent_name
+        } for msg in state.messages],
+        current_stage=state.stage.value,
+        is_completed=is_completed
+    )
+
 # ==================== 文化分析 ====================
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -109,7 +165,7 @@ async def generate_design(request: DesignRequest):
         logger.info("收到设计方案生成请求")
         
         # 调用创意设计智能体
-        design_options = creative_designer.generate_designs(
+        design_schema = creative_designer.generate_designs(
             culture_analysis=request.culture_analysis,
             user_preference=request.user_preference
         )
@@ -117,7 +173,7 @@ async def generate_design(request: DesignRequest):
         return DesignResponse(
             status="success",
             message="设计方案生成完成",
-            design_options=design_options,
+            design_schema=design_schema,
             num_options=3
         )
         
@@ -289,7 +345,7 @@ async def refine_design(request: RefineDesignRequest):
         return DesignResponse(
             status="success",
             message="设计方案优化完成",
-            design_options=refined_design,
+            design_schema=refined_design,
             num_options=1
         )
         

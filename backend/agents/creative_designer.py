@@ -43,17 +43,17 @@ class CreativeDesignerAgent:
             design_references = self._retrieve_design_cases(culture_analysis)
             
             # 步骤2：使用LLM生成设计方案
-            design_options = self._generate_design_options(
+            design_schema = self._generate_design_schema(
                 culture_analysis,
                 design_references,
                 user_preference
             )
             
             # 步骤3：敏感词检测
-            self._check_content_safety(design_options)
+            self._check_content_safety(design_schema)
             
             logger.info("设计方案生成完成")
-            return design_options
+            return design_schema
             
         except Exception as e:
             logger.error(f"设计方案生成失败: {e}")
@@ -82,7 +82,7 @@ class CreativeDesignerAgent:
             logger.warning(f"设计案例检索失败: {e}")
             return "设计案例检索失败"
     
-    def _generate_design_options(
+    def _generate_design_schema(
         self,
         culture_analysis: str,
         design_references: str,
@@ -91,12 +91,13 @@ class CreativeDesignerAgent:
         """使用LLM生成设计方案"""
         try:
             # 调用LLM服务的专用接口
-            design_options = llm_service.generate_design_options(
+            design_schema = llm_service.generate_design_schema(
                 culture_analysis,
+                design_references or "",
                 user_preference or "无特殊要求"
             )
             
-            return design_options
+            return design_schema
             
         except Exception as e:
             logger.error(f"LLM生成设计方案失败: {e}")
@@ -111,29 +112,31 @@ class CreativeDesignerAgent:
             
             if not result["is_safe"]:
                 logger.warning(f"设计方案包含敏感词: {result['found_words']}")
-                # 这里可以选择抛出异常或记录警告
-                # 目前仅记录警告
             else:
                 logger.info("设计方案内容审核通过")
                 
         except Exception as e:
             logger.warning(f"内容审核失败: {e}")
-    
-    def extract_image_prompt(self, design_option: str) -> str:
+
+    def extract_image_prompt(self, design_option: str, user_input: str) -> str:
         """
         从设计方案中提取图像生成Prompt
         
         Args:
-            design_option: 单个设计方案的文本
+            design_option: 设计方案的文本
+            user_input: 用户对给出设计方案的确认：选择的方案编号或调整建议
             
         Returns:
-            优化后的英文图像生成Prompt
+            图像生成Prompt
         """
         try:
             logger.info("提取并优化图像生成Prompt")
+        
+            # 结合设计方案和用户输入
+            combined_input = f"{design_option}\n用户调整建议：{user_input}"
             
             # 使用LLM优化Prompt
-            image_prompt = llm_service.refine_image_prompt(design_option)
+            image_prompt = llm_service.refine_image_prompt(combined_input)
             
             logger.info(f"图像生成Prompt: {image_prompt}")
             return image_prompt
@@ -141,7 +144,7 @@ class CreativeDesignerAgent:
         except Exception as e:
             logger.error(f"提取图像Prompt失败: {e}")
             # 返回默认Prompt
-            return "A beautiful Chinese village mural painting with traditional cultural elements"
+            return design_option
     
     def refine_design(
         self,

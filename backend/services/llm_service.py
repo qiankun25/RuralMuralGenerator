@@ -3,7 +3,7 @@ LLM服务
 封装通义千问API调用
 """
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 import logging
 import yaml
 from pathlib import Path
@@ -152,7 +152,53 @@ class LLMService:
             temperature=temperature,
             max_tokens=max_tokens
         )
-    
+
+    def manager_analyze_intent(self, user_input: str, current_state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        经理智能体-意图解析与路由决策
+
+        Args:
+            user_input: 用户输入文本
+            current_state: 当前对话状态
+
+        Returns:
+            路由决策结果，包含目标智能体和相关参数
+        """
+        system_template = self.prompts.get('manager_agent', {}).get('system_prompt')
+
+        user_template = self.prompts.get('manager_agent', {}).get('user_prompt')
+        try:
+            user_prompt = user_template.format(
+                stage=current_state.get('stage','INIT'),
+                last_agent=current_state.get('last_agent','None'),
+                last_agent_output=current_state.get('last_agent_output','None'),
+                user_input=user_input
+            )
+        except Exception:
+            user_prompt = f"用户输入：{user_input}\n当前状态：{current_state}"
+
+        response_text = self.generate_text(
+            prompt=user_prompt,
+            system_prompt=system_template,
+            temperature=0.6,
+            max_tokens=1000
+        )
+
+        try:
+            # 解析LLM返回的JSON格式结果
+            # {{
+            #   "action": "NEW|CONFIRM|MODIFY",
+            #   "next_stage": "CULTURE|DESIGN|IMAGE",
+            #   "modifications": "如果action为MODIFY,请简要描述用户希望修改的内容，否则为空字符串",
+            #   "reasoning":"简要说明你的判断依据"
+            # }}
+            import json
+            result = json.loads(response_text)
+            return result
+        except json.JSONDecodeError as e:
+            logger.error(f"解析经理智能体响应失败: {e}")
+            raise
+
     def analyze_culture(self, village_info: Dict, knowledge_context: str) -> str:
         """
         文化分析专用接口
@@ -188,14 +234,15 @@ class LLMService:
             temperature=0.7,
             max_tokens=2000
         )
-        
-    
-    def generate_design_options(self, culture_analysis: str, user_preference: str = "") -> str:
+
+
+    def generate_design_schema(self, culture_analysis: str, design_references: str = "", user_preference: str = "") -> str:
         """
         生成设计方案专用接口
         
         Args:
             culture_analysis: 文化分析报告
+            design_references: 设计参考资料（可选）
             user_preference: 用户偏好（可选）
             
         Returns:
@@ -208,7 +255,8 @@ class LLMService:
         try:
             user_prompt = user_template.format(
                 culture_analysis=culture_analysis,
-                user_preference=user_preference if user_preference else '无特殊要求'
+                user_preference=user_preference if user_preference else '无特殊要求',
+                design_references=design_references if design_references else '无参考资料'
             )
         except Exception:
             user_prompt = f"文化分析：{culture_analysis}\n用户偏好：{user_preference}"

@@ -27,7 +27,6 @@ def check_imports():
         ("文化分析智能体", "backend.agents.culture_analyst", "CultureAnalystAgent"),
         ("创意设计智能体", "backend.agents.creative_designer", "CreativeDesignerAgent"),
         ("图像生成智能体", "backend.agents.image_generator", "ImageGeneratorAgent"),
-        ("CrewAI管理器", "backend.agents.crew_manager", "CrewManager"),
         ("API路由", "backend.api.routes", "router"),
         ("API模型", "backend.api.models", "VillageInfo"),
     ]
@@ -79,7 +78,7 @@ def check_files():
         "backend/agents/culture_analyst.py",
         "backend/agents/creative_designer.py",
         "backend/agents/image_generator.py",
-        "backend/agents/crew_manager.py",
+        "backend/agents/manager_agent.py",
         "backend/api/__init__.py",
         "backend/api/models.py",
         "backend/api/routes.py",
