@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from models.session import create_session, get_session
 from models.state import  Stage
 from services.workflow_manager import run_workflow  
+from fastapi.responses import StreamingResponse
+import requests
 
 router = APIRouter()
 
@@ -284,6 +286,15 @@ async def _generate_image_task(
         tasks_storage[task_id]["status"] = "failed"
         tasks_storage[task_id]["error"] = str(e)
         tasks_storage[task_id]["updated_at"] = datetime.now()
+
+
+@router.get("/api/proxy-image")
+async def proxy_image(url: str):
+    # 使用requests库从内部服务获取图片
+    response = requests.get(url, stream=True)
+    
+    # 返回图片数据
+    return StreamingResponse(response.iter_content(chunk_size=1024), media_type=response.headers['Content-Type'])
 
 
 # ==================== 任务状态查询 ====================

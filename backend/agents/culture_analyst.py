@@ -5,6 +5,7 @@
 
 from typing import Dict, List
 import logging
+from services.llm_service import clean_markdown_code_block
 logger = logging.getLogger(__name__)
 
 try:
@@ -146,7 +147,7 @@ class CultureAnalystAgent:
         try:
             # 调用LLM服务的专用接口
             analysis = llm_service.analyze_culture(village_info, knowledge_context)
-            
+            analysis = clean_markdown_code_block(analysis)
             # 添加数据来源说明
             analysis += "\n\n---\n\n"
             analysis += "**数据来源**\n"
@@ -159,6 +160,8 @@ class CultureAnalystAgent:
         except Exception as e:
             logger.error(f"LLM分析失败: {e}")
             raise
+
+
 
 
 # 创建全局文化分析智能体实例

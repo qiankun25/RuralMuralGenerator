@@ -131,10 +131,15 @@ def _handle_confirm(state: MuralGenerationState, next_stage: Stage) -> bool:
             agent_name = AgentName.MANAGER
         else:
             image_prompt = creative_designer.extract_image_prompt(design, state.get_last_user_input())
-            result = image_generator.generate(image_prompt=image_prompt)
+            result = image_generator.generate(image_prompt=image_prompt)#j结果字典
             state.workflow_data["image_result"] = result
             
-            agent_output = f"图像生成完成！\n\n{result}\n\n请确认是否满意，或要求重新生成。"
+            agent_output = {
+            "type": "image",
+            "url": result["images"][0]["url"],  # 提取第一个图片 URL
+            "prompt": result["prompt"],
+            "text": "图像生成完成！\n\n请确认是否满意，或要求重新生成。"
+        }
             agent_name = AgentName.IMAGE_GENERATOR
 
     else:

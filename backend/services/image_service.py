@@ -107,8 +107,7 @@ class ImageGenerationService:
                 return {
                     "status": "success",
                     "images": results,
-                    "prompt": prompt,
-                    "style": style or self.default_style
+                    "prompt": prompt
                 }
             else:
                 error_msg = f"图像生成失败: {response.code} - {response.message}"

@@ -6,6 +6,7 @@ LLM服务
 from typing import Optional, List, Dict, Any
 import logging
 import yaml
+import re
 from pathlib import Path
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,18 @@ def load_prompts(prompt_file: str = "agent_prompts.yaml") -> Dict:
     file_path = PROMPT_PATH / prompt_file
     with open(file_path, 'r', encoding='utf-8') as f:
          return yaml.safe_load(f)
+
+
+def clean_markdown_code_block(text: str) -> str:
+    """
+    移除可能存在的 ```markdown 或 ``` 包裹
+    """
+    # 匹配 ```markdown\n...\n``` 或 ```\n...\n```
+    pattern = r"^```(?:markdown)?\s*\n(.*?)\n```$"
+    match = re.search(pattern, text.strip(), re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return text.strip()
     
 
 class LLMService:

@@ -10,6 +10,7 @@ from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 
 from services import llm_service, chromadb_service
+from services.llm_service import clean_markdown_code_block
 from tools import design_cases_tool, sensitive_check_tool
 from core.config import settings
 
@@ -48,6 +49,8 @@ class CreativeDesignerAgent:
                 design_references,
                 user_preference
             )
+
+            design_schema = clean_markdown_code_block(design_schema)
             
             # 步骤3：敏感词检测
             self._check_content_safety(design_schema)

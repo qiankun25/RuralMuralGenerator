@@ -17,6 +17,34 @@ st.set_page_config(
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
+def convert_local_image_urls_to_proxy(content: str) -> str:
+    """
+    将 content 中的 http://localhost:8000/media/... 图片 URL
+    自动替换为代理 URL: {API_BASE_URL}/api/proxy-image?url=...
+    """
+    import re
+
+    # 匹配 Markdown 图片语法中的本地 media URL
+    pattern = r'!\[([^\]]*)\]\((http://localhost:8000/media/[^\)]+)\)'
+
+    def replace_func(match):
+        alt_text = match.group(1)
+        local_url = match.group(2)
+        proxy_url = f"{API_BASE_URL}/api/proxy-image?url={local_url}"
+        return f"![{alt_text}]({proxy_url})"
+
+    return re.sub(pattern, replace_func, content)
+
+def clean_llm_output(text: str) -> str:
+    """移除 LLM 返回的 Markdown 代码块包裹"""
+    text = text.strip()
+    if text.startswith("```") and text.endswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3 and lines[0].strip().startswith("```"):
+            return "\n".join(lines[1:-1]).strip()
+    return text
+
+
 # 自定义CSS
 st.markdown("""
 <style>
@@ -140,17 +168,36 @@ def render_message(msg: Dict):
     content = msg["content"]
     agent_name = msg.get("agent_name", "")
 
-    if role == "user":
-        css_class = "user-message"
-    else:
-        css_class = "assistant-message"
+    if isinstance(content, dict) and content.get("type") == "image":
+        url = content["url"]
+        prompt = content.get("prompt", "")
+        text = content.get("text", "")
 
-    if agent_name and role != "user":
-        st.markdown(f'<div class="agent-tag">[{agent_name}]</div>', unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="message {css_class}">{content}</div>',
-        unsafe_allow_html=True
-    )
+        # 构建图片 HTML
+        img_html = f'<div class="message assistant-message">'
+        if agent_name:
+            img_html += f'<div class="agent-tag">[{agent_name}]</div>'
+        img_html += f'<img src="{url}" style="width:100%; border-radius:8px; margin-top:8px;">'
+        if text:
+            img_html += f"<p>{text}</p>"
+        if prompt:
+            img_html += f'<small><em>生成提示：</em> {prompt}</small>'
+        img_html += "</div>"
+        st.markdown(img_html, unsafe_allow_html=True)
+        return
+
+   # 构建消息 HTML
+    message_class = "user-message" if role == "user" else "assistant-message"
+    html_content = f'<div class="message {message_class}">'
+
+    if role != "user" and agent_name:
+        html_content += f'<div class="agent-tag">[{agent_name}]</div>'
+
+    # 转义用户输入中的特殊字符（避免 XSS，但 Streamlit 本身较安全）
+    html_content += f"{content}"
+    html_content += "</div>"
+
+    st.markdown(html_content, unsafe_allow_html=True)
 
 
 def show_initial_form():
